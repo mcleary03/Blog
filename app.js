@@ -1,14 +1,17 @@
-var methodOverride = require("method-override"),
-    bodyParser     = require("body-parser"),
-    mongoose       = require("mongoose"),
-    express        = require("express"),
-    app            = express()
+var expressSanitizer = require("express-sanitizer"),
+    methodOverride   = require("method-override"),
+    bodyParser       = require("body-parser"),
+    mongoose         = require("mongoose"),
+    express          = require("express"),
+    app              = express()
 
 // APP CONFIG
 mongoose.connect("mongodb://localhost/restful_blog_app")
 app.set("view engine", "ejs")
 app.use(express.static("public"))
 app.use(bodyParser.urlencoded({extended: true}))
+// *** express-sanitizer must go after body-parser ***
+app.use(expressSanitizer())
 // method-override takes an argument of what to look for to override
 app.use(methodOverride("_method"))
 
@@ -46,6 +49,10 @@ app.get("/blogs/new", (req, res) => {
 
 // CREATE ROUTE
 app.post("/blogs", (req, res) => {
+    // req.body is what's returned from the form,
+    //  blog.body is what we called the actual body of the blog
+    //   this is the only place where we allow for html injection
+    req.body.blog.body = req.sanitize(req.body.blog.body)
     Blog.create(req.body.blog, (err, blog) => {
         if (err) {
             res.render("new")
@@ -79,6 +86,8 @@ app.get("/blogs/:id/edit", (req, res) => {
 
 // UPDATE ROUTE
 app.put("/blogs/:id", (req, res) => {
+    // sanitizing body to prevent injection attacks
+    req.body.blog.body = req.sanitize(req.body.blog.body)
     //   findByIdAndUpdate(id, newData, callback)
     Blog.findByIdAndUpdate(req.params.id, req.body.blog, (err, blog) => {
         if (err) {
@@ -91,7 +100,6 @@ app.put("/blogs/:id", (req, res) => {
 
 //  DELETE ROUTE
 app.delete("/blogs/:id", (req, res) => {
-    //destroy blog
     Blog.findByIdAndRemove(req.params.id, (err) => {
         if (err) {
             res.redirect("blogs/")
@@ -99,7 +107,6 @@ app.delete("/blogs/:id", (req, res) => {
             res.redirect("/blogs")
         }
     })
-    //redirect
 })
 
 app.listen(process.env.PORT, process.env.IP, () => {
